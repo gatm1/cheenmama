@@ -5,6 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Menú Cheen Mamá</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Incluir Font Awesome para íconos -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    /* Animación de parpadeo para el botón del carrito */
+    @keyframes blink {
+      0% { opacity: 1; }
+      50% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+    .blink {
+      animation: blink 0.5s ease-in-out 2;
+    }
+  </style>
 </head>
 <body class="bg-gray-100">
   <div id="app" class="container mx-auto p-4 max-w-md">
@@ -94,7 +107,7 @@
       <p class="text-xl font-bold mt-4">Total: $<span id="cart-total">0.00</span></p>
       <div class="mt-4">
         <input type="text" id="customer-name" placeholder="Nombre" class="w-full p-2 mb-2 border rounded">
-        <input type="text" id="customer-address" placeholder="Día del pedido" class="w-full p-2 mb-2 border rounded" readonly>
+        <input type="text" id="customer-address" placeholder="Día del pedido" class="w-full p-2 mb-2 border rounded">
         <textarea id="customer-details" placeholder="Detalles adicionales (ej. Sin cebolla)" class="w-full p-2 mb-2 border rounded" rows="3"></textarea>
         <button id="send-order-btn" class="w-full bg-green-500 text-white p-2 rounded">Enviar por WhatsApp</button>
       </div>
@@ -115,7 +128,7 @@
     let isAdmin = false;
     let activeMenuDay = 'Jueves'; // Valor inicial
     const adminPassword = 'admin123'; // CAMBIA ESTA CONTRASEÑA
-    const whatsappNumber = '+523318331309'; // CAMBIA ESTE NÚMERO
+    const whatsappNumber = '+521234567890'; // CAMBIA ESTE NÚMERO
 
     // Elementos del DOM
     const app = document.getElementById('app');
@@ -295,17 +308,41 @@
       }
     }
 
-    // Renderizar el menú
+    // Renderizar el menú con estilos por categoría
     function renderMenu() {
       menuDiv.innerHTML = '';
       categories.forEach(category => {
         const categoryProducts = products.filter(p => p.category === category);
         if (categoryProducts.length > 0) {
           const categoryDiv = document.createElement('div');
-          categoryDiv.innerHTML = `<h2 class="text-xl font-semibold mt-4">${category}</h2>`;
+          // Estilos específicos por categoría
+          let categoryStyles = '';
+          let iconClass = '';
+          let borderColor = '';
+          if (category === 'Platillos') {
+            categoryStyles = 'bg-green-50';
+            iconClass = 'fa-utensils';
+            borderColor = 'border-l-green-500';
+          } else if (category === 'Bebidas') {
+            categoryStyles = 'bg-blue-50';
+            iconClass = 'fa-glass-water';
+            borderColor = 'border-l-blue-500';
+          } else if (category === 'Postres') {
+            categoryStyles = 'bg-pink-50';
+            iconClass = 'fa-cake-candles';
+            borderColor = 'border-l-pink-500';
+          }
+          categoryDiv.className = `p-4 rounded-lg ${categoryStyles} mb-4`;
+          categoryDiv.innerHTML = `
+            <h2 class="text-xl font-semibold mb-3 flex items-center">
+              <i class="fas ${iconClass} mr-2 text-lg"></i>
+              ${category}
+              <span class="flex-grow h-px bg-gray-300 ml-2"></span>
+            </h2>
+          `;
           categoryProducts.forEach(product => {
             const productDiv = document.createElement('div');
-            productDiv.className = 'bg-white p-4 rounded-lg shadow mb-2';
+            productDiv.className = `bg-white p-4 rounded-lg shadow mb-2 border-l-4 ${borderColor}`;
             const price = typeof product.price === 'number' ? product.price : parseFloat(product.price || 0);
             productDiv.innerHTML = `
               <h3 class="text-lg font-semibold">${product.name}</h3>
@@ -379,8 +416,9 @@
       window.scrollTo({ top: editForm.offsetTop, behavior: 'smooth' });
     }
 
-    // Mostrar mensaje de confirmación
-    function showConfirmationMessage() {
+    // Mostrar mensaje de confirmación con el nombre del producto
+    function showConfirmationMessage(productName) {
+      confirmationMessage.textContent = `${productName} agregado con éxito a tu pedido.`;
       confirmationMessage.classList.remove('hidden');
       setTimeout(() => {
         confirmationMessage.classList.add('hidden');
@@ -397,13 +435,15 @@
         cart.push({ ...product, price, quantity: 1 });
       }
       renderCart();
-      showConfirmationMessage(); // Mostrar mensaje de confirmación
+      showConfirmationMessage(product.name); // Mostrar mensaje con el nombre del producto
+      toggleCartBtn.classList.add('blink'); // Añadir animación de parpadeo
     }
 
     // Renderizar el carrito
     function renderCart() {
       cartItemsDiv.innerHTML = cart.length === 0 ? '<p>El carrito está vacío.</p>' : '';
       let total = 0;
+      let totalItems = 0; // Contador para la cantidad total de ítems
       cart.forEach(item => {
         const itemDiv = document.createElement('div');
         itemDiv.className = 'flex justify-between items-center mb-2';
@@ -422,9 +462,10 @@
         `;
         cartItemsDiv.appendChild(itemDiv);
         total += price * item.quantity;
+        totalItems += item.quantity; // Sumar la cantidad de cada producto
       });
       cartTotal.textContent = total.toFixed(2);
-      toggleCartBtn.textContent = cartSection.classList.contains('hidden') ? `Carrito (${cart.length})` : 'Menú';
+      toggleCartBtn.textContent = cartSection.classList.contains('hidden') ? `Carrito (${totalItems})` : 'Menú';
       // Cambiar color del botón según si hay productos
       toggleCartBtn.classList.remove('bg-blue-500', 'bg-green-500');
       toggleCartBtn.classList.add(cart.length > 0 ? 'bg-green-500' : 'bg-blue-500');
@@ -436,6 +477,7 @@
           const item = cart.find(i => i.id === productId);
           item.quantity += 1;
           renderCart();
+          toggleCartBtn.classList.add('blink'); // Añadir animación al incrementar
         });
       });
 
@@ -448,6 +490,7 @@
             cart = cart.filter(i => i.id !== productId);
           }
           renderCart();
+          toggleCartBtn.classList.add('blink'); // Añadir animación al decrementar
         });
       });
 
@@ -456,6 +499,7 @@
           const productId = parseInt(button.getAttribute('data-id'));
           cart = cart.filter(i => i.id !== productId);
           renderCart();
+          toggleCartBtn.classList.add('blink'); // Añadir animación al eliminar
         });
       });
     }
@@ -499,7 +543,7 @@
     toggleCartBtn.addEventListener('click', () => {
       cartSection.classList.toggle('hidden');
       menuSection.classList.toggle('hidden');
-      toggleCartBtn.textContent = cartSection.classList.contains('hidden') ? `Carrito (${cart.length})` : 'Menú';
+      toggleCartBtn.textContent = cartSection.classList.contains('hidden') ? `Carrito (${cart.reduce((sum, item) => sum + item.quantity, 0)})` : 'Menú';
       renderCart(); // Asegurarse de que el color del botón se actualice
     });
 
