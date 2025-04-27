@@ -102,12 +102,13 @@
       <div id="admin-products"></div>
     </div>
     <div id="cart-section" class="hidden bg-white p-4 rounded-lg shadow">
-      <h2 class="text-xl font-bold mb-4">Carrito</h2>
+      <h2 class="text-2xl font-bold mb-4">Carrito</h2>
+      <h2 class="text-xl font-bold mb-4">Por favor revise su pedido.</h2> <!-- Se agrega el texto de revisión -->
       <div id="cart-items"></div>
       <p class="text-xl font-bold mt-4">Total: $<span id="cart-total">0.00</span></p>
       <div class="mt-4">
         <input type="text" id="customer-name" placeholder="Nombre" class="w-full p-2 mb-2 border rounded">
-        <input type="text" id="customer-address" placeholder="Día del pedido" class="w-full p-2 mb-2 border rounded">
+        <input type="text" id="customer-address" placeholder="Día del pedido" class="w-full p-2 mb-2 border rounded" readonly>
         <textarea id="customer-details" placeholder="Detalles adicionales (ej. Sin cebolla)" class="w-full p-2 mb-2 border rounded" rows="3"></textarea>
         <button id="send-order-btn" class="w-full bg-green-500 text-white p-2 rounded">Enviar por WhatsApp</button>
       </div>
@@ -127,8 +128,8 @@
     let cart = [];
     let isAdmin = false;
     let activeMenuDay = 'Jueves'; // Valor inicial
-    const adminPassword = 'admin123'; // CAMBIA ESTA CONTRASEÑA
-    const whatsappNumber = '+521234567890'; // CAMBIA ESTE NÚMERO
+    const adminPassword = 'zirus'; // CAMBIA ESTA CONTRASEÑA
+    const whatsappNumber = '+523318331309'; // CAMBIA ESTE NÚMERO
 
     // Elementos del DOM
     const app = document.getElementById('app');
