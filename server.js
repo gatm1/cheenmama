@@ -1,8 +1,9 @@
-const express = require('express');
-const { createClient } = require('@supabase/supabase-js'); // Usando require para la prueba
 
-const path = require('path');
-const app = express();
+import { createClient } from '@supabase/supabase-js'
+const supabaseUrl = 'https://atcourwrpscnqhzofnoe.supabase.co'
+const supabaseKey = process.env.SUPABASE_KEY
+const supabase = createClient(supabaseUrl, supabaseKey)
+
 
 // Variable para almacenar el día activo del menú (por defecto Jueves)
 let activeMenuDay = 'Jueves';
