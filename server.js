@@ -1,5 +1,6 @@
 const express = require('express');
-const { createClient } from '@supabase/supabase-js';
+const { createClient } = require('@supabase/supabase-js'); // Usando require para la prueba
+
 const path = require('path');
 const app = express();
 
