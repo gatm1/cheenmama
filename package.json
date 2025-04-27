@@ -12,7 +12,5 @@
   },
   "engines": {
     "node": ">=20.0.0"
-    // o podrías ser más específico:
-    // "node": "22.14.0"
   }
 }
