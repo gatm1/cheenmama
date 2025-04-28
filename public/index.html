@@ -22,7 +22,7 @@
 <body class="bg-gray-100">
   <div id="app" class="container mx-auto p-4 max-w-md">
     <h1 class="text-2xl font-bold text-center mb-2">Menú Cheen Mamá</h1>
-    <p class="text-center text-sm text-gray-600 mb-4">Pedidos especiales al teléfono: 3318331309</p>
+    <p id="special-orders-phone" class="text-center text-sm text-gray-600 mb-4">Pedidos especiales al teléfono: Cargando...</p>
     <div id="closed-message" class="hidden text-center">
       <h1 class="text-2xl font-bold mb-4">Pedidos Cerrados</h1>
       <p>Los pedidos se abren el lunes a las 9:00 a.m.</p>
@@ -44,6 +44,16 @@
     <div id="admin-section" class="hidden">
       <h1 class="text-2xl font-bold text-center mb-4">Administrar Menú</h1>
       <button id="admin-logout" class="mb-4 bg-red-500 text-white px-4 py-2 rounded">Cerrar sesión</button>
+      <div class="mb-4 bg-white p-4 rounded-lg shadow">
+        <h2 class="text-xl font-semibold mb-2">Configuraciones</h2>
+        <label for="whatsapp-number" class="block text-sm font-medium text-gray-700">Número de WhatsApp:</label>
+        <input type="text" id="whatsapp-number" placeholder="Número de WhatsApp (ej. +523318331309)" class="w-full p-2 mb-2 border rounded">
+        <label for="special-orders-phone-input" class="block text-sm font-medium text-gray-700">Teléfono para pedidos especiales:</label>
+        <input type="text" id="special-orders-phone-input" placeholder="Teléfono (ej. 3318331309)" class="w-full p-2 mb-2 border rounded">
+        <label for="admin-password-input" class="block text-sm font-medium text-gray-700">Contraseña de administrador:</label>
+        <input type="password" id="admin-password-input" placeholder="Nueva contraseña" class="w-full p-2 mb-2 border rounded">
+        <button id="update-settings-btn" class="w-full bg-blue-500 text-white p-2 rounded">Actualizar Configuraciones</button>
+      </div>
       <div class="mb-4">
         <label for="active-menu-day" class="block text-sm font-medium text-gray-700">Menú activo para:</label>
         <select id="active-menu-day" class="w-full p-2 border rounded">
@@ -128,8 +138,11 @@
     let cart = [];
     let isAdmin = false;
     let activeMenuDay = 'Jueves'; // Valor inicial
-    const adminPassword = 'zirus'; // CAMBIA ESTA CONTRASEÑA
-    const whatsappNumber = '+523318331309'; // CAMBIA ESTE NÚMERO
+    let settings = {
+      whatsappNumber: '',
+      specialOrdersPhone: '',
+      adminPassword: ''
+    };
 
     // Elementos del DOM
     const app = document.getElementById('app');
@@ -175,31 +188,89 @@
     const sendOrderBtn = document.getElementById('send-order-btn');
     const toggleCartBtn = document.getElementById('toggle-cart-btn');
     const confirmationMessage = document.getElementById('confirmation-message');
+    const specialOrdersPhoneText = document.getElementById('special-orders-phone');
+    const whatsappNumberInput = document.getElementById('whatsapp-number');
+    const specialOrdersPhoneInput = document.getElementById('special-orders-phone-input');
+    const adminPasswordInputSettings = document.getElementById('admin-password-input');
+    const updateSettingsBtn = document.getElementById('update-settings-btn');
 
     // Variable para rastrear el estado actual (menú o carrito)
     let currentState = 'menu'; // Estado inicial: menú
 
+    // Obtener configuraciones del servidor
+    async function fetchSettings() {
+      try {
+        const res = await fetch('/api/settings');
+        if (!res.ok) {
+          throw new Error('Error al obtener configuraciones: ' + res.statusText);
+        }
+        const data = await res.json();
+        settings = data;
+        // Actualizar el texto del teléfono de pedidos especiales
+        specialOrdersPhoneText.textContent = `Pedidos especiales al teléfono: ${settings.specialOrdersPhone}`;
+        // Actualizar los valores en el formulario de administrador
+        if (isAdmin) {
+          whatsappNumberInput.value = settings.whatsappNumber;
+          specialOrdersPhoneInput.value = settings.specialOrdersPhone;
+          adminPasswordInputSettings.value = ''; // No mostramos la contraseña hasheada
+        }
+      } catch (err) {
+        console.error('Error fetching settings:', err);
+        specialOrdersPhoneText.textContent = 'Error al cargar el teléfono de pedidos especiales.';
+      }
+    }
+
+    // Verificar contraseña de administrador
+    async function verifyAdminPassword(password) {
+      try {
+        const response = await fetch('/api/verify-admin-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password })
+        });
+        const result = await response.json();
+        return result.success;
+      } catch (err) {
+        console.error('Error al verificar contraseña:', err);
+        return false;
+      }
+    }
+
+    // Actualizar configuraciones
+    async function updateSettings() {
+      const whatsappNumber = whatsappNumberInput.value.trim();
+      const specialOrdersPhone = specialOrdersPhoneInput.value.trim();
+      const adminPassword = adminPasswordInputSettings.value.trim();
+      if (!whatsappNumber || !specialOrdersPhone || !adminPassword) {
+        alert('Por favor, completa todos los campos de configuración.');
+        return;
+      }
+      try {
+        const response = await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ whatsappNumber, specialOrdersPhone, adminPassword })
+        });
+        const result = await response.json();
+        if (response.ok) {
+          settings.whatsappNumber = whatsappNumber;
+          settings.specialOrdersPhone = specialOrdersPhone;
+          settings.adminPassword = ''; // No almacenamos el hash en el cliente
+          specialOrdersPhoneText.textContent = `Pedidos especiales al teléfono: ${settings.specialOrdersPhone}`;
+          adminPasswordInputSettings.value = ''; // Limpiar el campo de contraseña
+          alert(result.message);
+        } else {
+          alert('Error al actualizar configuraciones: ' + result.message);
+        }
+      } catch (err) {
+        console.error('Error al actualizar configuraciones:', err);
+        alert('Error en el servidor: ' + err.message);
+      }
+    }
+
     // Verificar si los pedidos están cerrados
     function checkClosed() {
-      /*
-      const now = new Date();
-      const day = now.getDay(); // 0=Domingo, 1=Lunes, ..., 4=Jueves
-      const hours = now.getHours();
-      const minutes = now.getMinutes();
-
-      // Lunes a las 9:00 a.m. hasta jueves a las 10:00 a.m.
-      if (day === 1 && (hours < 9)) {
-        // Antes del lunes a las 9:00 a.m.
-        return true;
-      } else if (day === 4 && (hours > 10 || (hours === 10 && minutes >= 0))) {
-        // Después del jueves a las 10:00 a.m.
-        return true;
-      } else if (day > 4 || day === 0) {
-        // Viernes, sábado o domingo
-        return true;
-      }
-      */
-      return false;
+      return false; // Mantengo tu lógica comentada, puedes reactivarla si es necesario
     }
 
     // Mostrar u ocultar secciones según el estado
@@ -212,6 +283,10 @@
         toggleCartBtn.classList.add('hidden');
         adminSection.classList.remove('hidden');
         currentState = 'menu'; // Resetear el estado al entrar en admin
+        // Actualizar los valores del formulario de configuraciones
+        whatsappNumberInput.value = settings.whatsappNumber;
+        specialOrdersPhoneInput.value = settings.specialOrdersPhone;
+        adminPasswordInputSettings.value = ''; // No mostramos la contraseña hasheada
       } else if (isClosed) {
         closedMessage.classList.remove('hidden');
         menuSection.classList.add('hidden');
@@ -223,7 +298,6 @@
         closedMessage.classList.add('hidden');
         adminSection.classList.add('hidden');
         toggleCartBtn.classList.remove('hidden');
-        // No cambiamos menuSection ni cartSection aquí, lo manejamos con toggleCartBtn
       }
     }
 
@@ -321,7 +395,6 @@
         const categoryProducts = products.filter(p => p.category === category);
         if (categoryProducts.length > 0) {
           const categoryDiv = document.createElement('div');
-          // Estilos específicos por categoría
           let categoryStyles = '';
           let iconClass = '';
           let borderColor = '';
@@ -441,15 +514,15 @@
         cart.push({ ...product, price, quantity: 1 });
       }
       renderCart();
-      showConfirmationMessage(product.name); // Mostrar mensaje con el nombre del producto
-      toggleCartBtn.classList.add('blink'); // Añadir animación de parpadeo
+      showConfirmationMessage(product.name);
+      toggleCartBtn.classList.add('blink');
     }
 
     // Renderizar el carrito
     function renderCart() {
       cartItemsDiv.innerHTML = cart.length === 0 ? '<p>El carrito está vacío.</p>' : '';
       let total = 0;
-      let totalItems = 0; // Contador para la cantidad total de ítems
+      let totalItems = 0;
       cart.forEach(item => {
         const itemDiv = document.createElement('div');
         itemDiv.className = 'flex justify-between items-center mb-2';
@@ -468,22 +541,20 @@
         `;
         cartItemsDiv.appendChild(itemDiv);
         total += price * item.quantity;
-        totalItems += item.quantity; // Sumar la cantidad de cada producto
+        totalItems += item.quantity;
       });
       cartTotal.textContent = total.toFixed(2);
       toggleCartBtn.textContent = cartSection.classList.contains('hidden') ? `Carrito (${totalItems})` : 'Menú';
-      // Cambiar color del botón según si hay productos
       toggleCartBtn.classList.remove('bg-blue-500', 'bg-green-500');
       toggleCartBtn.classList.add(cart.length > 0 ? 'bg-green-500' : 'bg-blue-500');
 
-      // Añadir eventos a los botones del carrito
       document.querySelectorAll('.increment').forEach(button => {
         button.addEventListener('click', () => {
           const productId = parseInt(button.getAttribute('data-id'));
           const item = cart.find(i => i.id === productId);
           item.quantity += 1;
           renderCart();
-          toggleCartBtn.classList.add('blink'); // Añadir animación al incrementar
+          toggleCartBtn.classList.add('blink');
         });
       });
 
@@ -496,7 +567,7 @@
             cart = cart.filter(i => i.id !== productId);
           }
           renderCart();
-          toggleCartBtn.classList.add('blink'); // Añadir animación al decrementar
+          toggleCartBtn.classList.add('blink');
         });
       });
 
@@ -505,7 +576,7 @@
           const productId = parseInt(button.getAttribute('data-id'));
           cart = cart.filter(i => i.id !== productId);
           renderCart();
-          toggleCartBtn.classList.add('blink'); // Añadir animación al eliminar
+          toggleCartBtn.classList.add('blink');
         });
       });
     }
@@ -535,16 +606,16 @@
       if (details) {
         message += `\n\nDetalles adicionales: ${details}`;
       }
-      const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
+      const whatsappUrl = `https://wa.me/${settings.whatsappNumber}?text=${encodeURIComponent(message)}`;
       window.open(whatsappUrl, '_blank');
       cart = [];
       customerName.value = '';
-      customerAddress.value = activeMenuDay; // Restablecer al valor por defecto
+      customerAddress.value = activeMenuDay;
       customerDetails.value = '';
       cartSection.classList.add('hidden');
-      currentState = 'menu'; // Volver al estado 'menu'
-      history.pushState({ page: 'menu' }, 'Menú', '#menu'); // Actualizar el historial
-      toggleCartBtn.textContent = `Carrito (${cart.reduce((sum, item) => sum + item.quantity, 0)})`; // Actualizar texto del botón
+      currentState = 'menu';
+      history.pushState({ page: 'menu' }, 'Menú', '#menu');
+      toggleCartBtn.textContent = `Carrito (${cart.reduce((sum, item) => sum + item.quantity, 0)})`;
       renderCart();
     });
 
@@ -553,28 +624,24 @@
       cartSection.classList.toggle('hidden');
       menuSection.classList.toggle('hidden');
       if (cartSection.classList.contains('hidden')) {
-        // Volviendo al menú
         currentState = 'menu';
         history.pushState({ page: 'menu' }, 'Menú', '#menu');
         toggleCartBtn.textContent = `Carrito (${cart.reduce((sum, item) => sum + item.quantity, 0)})`;
       } else {
-        // Abriendo el carrito
         currentState = 'cart';
         history.pushState({ page: 'cart' }, 'Carrito', '#cart');
         toggleCartBtn.textContent = 'Menú';
       }
-      renderCart(); // Asegurarse de que el color del botón se actualice
+      renderCart();
     });
 
     // Manejar el botón "Atrás" del navegador
     window.addEventListener('popstate', (event) => {
       if (isAdmin) {
-        // Si está en modo admin, permitir el comportamiento por defecto del navegador
         return;
       }
 
       if (currentState === 'cart') {
-        // Si está en el carrito, regresar al menú
         cartSection.classList.add('hidden');
         menuSection.classList.remove('hidden');
         currentState = 'menu';
@@ -582,13 +649,10 @@
         history.pushState({ page: 'menu' }, 'Menú', '#menu');
         renderCart();
       } else if (currentState === 'menu') {
-        // Si está en el menú, mostrar mensaje de confirmación
         const confirmExit = window.confirm('¿Desea salir del sitio?');
         if (confirmExit) {
-          // Permitir salir del sitio
           window.history.back();
         } else {
-          // Mantenerse en el menú
           history.pushState({ page: 'menu' }, 'Menú', '#menu');
           cartSection.classList.add('hidden');
           menuSection.classList.remove('hidden');
@@ -609,24 +673,28 @@
     });
 
     // Iniciar sesión desde el menú
-    adminLoginSubmit.addEventListener('click', () => {
-      if (adminPasswordInput.value === adminPassword) {
+    adminLoginSubmit.addEventListener('click', async () => {
+      const password = adminPasswordInput.value;
+      const isValid = await verifyAdminPassword(password);
+      if (isValid) {
         isAdmin = true;
         updateVisibility();
         adminForm.classList.add('hidden');
-        fetchAllProducts(); // Cargar todos los productos para admin
+        fetchAllProducts();
       } else {
         alert('Contraseña incorrecta');
       }
     });
 
     // Iniciar sesión desde el mensaje de cerrado
-    adminLoginSubmitClosed.addEventListener('click', () => {
-      if (adminPasswordClosed.value === adminPassword) {
+    adminLoginSubmitClosed.addEventListener('click', async () => {
+      const password = adminPasswordClosed.value;
+      const isValid = await verifyAdminPassword(password);
+      if (isValid) {
         isAdmin = true;
         updateVisibility();
         adminLoginForm.classList.add('hidden');
-        fetchAllProducts(); // Cargar todos los productos para admin
+        fetchAllProducts();
       } else {
         alert('Contraseña incorrecta');
       }
@@ -637,9 +705,8 @@
       isAdmin = false;
       editForm.classList.add('hidden');
       updateVisibility();
-      fetchProducts(); // Volver a cargar los productos del día actual
-      fetchMenuDay(); // Actualizar el día del menú al cerrar sesión
-      // Asegurarse de que el historial refleje el estado del menú
+      fetchProducts();
+      fetchMenuDay();
       history.pushState({ page: 'menu' }, 'Menú', '#menu');
       currentState = 'menu';
     });
@@ -671,9 +738,9 @@
         console.log('Respuesta del servidor:', responseBody);
         if (response.ok) {
           const addedProduct = JSON.parse(responseBody);
-          addedProduct.price = parseFloat(addedProduct.price); // Convertir price a número
+          addedProduct.price = parseFloat(addedProduct.price);
           products.push(addedProduct);
-          filterProductsByDay(); // Actualizar la lista filtrada
+          filterProductsByDay();
           renderMenu();
           newName.value = '';
           newDescription.value = '';
@@ -715,7 +782,7 @@
           updatedProduct.price = parseFloat(updatedProduct.price);
           const index = products.findIndex(p => p.id === id);
           products[index] = updatedProduct;
-          filterProductsByDay(); // Actualizar la lista filtrada
+          filterProductsByDay();
           renderMenu();
           editForm.classList.add('hidden');
           alert('Producto actualizado con éxito');
@@ -742,7 +809,7 @@
         if (response.ok) {
           products = products.filter(product => product.id !== id);
           cart = cart.filter(item => item.id !== id);
-          filterProductsByDay(); // Actualizar la lista filtrada
+          filterProductsByDay();
           renderMenu();
           renderCart();
         } else {
@@ -754,11 +821,15 @@
       }
     }
 
+    // Añadir evento para actualizar configuraciones
+    updateSettingsBtn.addEventListener('click', updateSettings);
+
     // Inicializar
-    fetchMenuDay(); // Obtener el día activo al cargar la página
+    fetchSettings(); // Obtener configuraciones al cargar la página
+    fetchMenuDay();
     fetchProducts();
     updateVisibility();
-    setInterval(updateVisibility, 60000); // Verifica cada minuto
+    setInterval(updateVisibility, 60000);
 
     // Asegurarse de que el historial comience en el estado 'menu'
     history.pushState({ page: 'menu' }, 'Menú', '#menu');
