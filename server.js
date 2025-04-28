@@ -32,7 +32,7 @@ async function initializeSettings() {
         ['+523318331309', '3318331309', hashedPassword]
       );
       console.log('Configuraciones por defecto inicializadas');
-    } else if (result.rows[0].admin_password === 'temporary') {
+    } else if (result.rows[0].admin_password === 'zirus') {
       // Actualizar la contraseña temporal con un hash seguro
       const hashedPassword = await bcrypt.hash('zirus', 10);
       await pool.query(
