@@ -8,6 +8,5 @@
   "dependencies": {
     "express": "^4.17.1",
     "pg": "^8.11.3",
-    "bcrypt": "^5.1.1"
   }
 }
