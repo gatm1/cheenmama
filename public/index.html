@@ -103,7 +103,7 @@
     </div>
     <div id="cart-section" class="hidden bg-white p-4 rounded-lg shadow">
       <h2 class="text-2xl font-bold mb-4">Carrito</h2>
-      <h2 class="text-xl font-bold mb-4">Por favor revise su pedido.</h2> <!-- Se agrega el texto de revisión -->
+      <h2 class="text-xl font-bold mb-4">Por favor revise su pedido.</h2>
       <div id="cart-items"></div>
       <p class="text-xl font-bold mt-4">Total: $<span id="cart-total">0.00</span></p>
       <div class="mt-4">
@@ -176,6 +176,9 @@
     const toggleCartBtn = document.getElementById('toggle-cart-btn');
     const confirmationMessage = document.getElementById('confirmation-message');
 
+    // Variable para rastrear el estado actual (menú o carrito)
+    let currentState = 'menu'; // Estado inicial: menú
+
     // Verificar si los pedidos están cerrados
     function checkClosed() {
       /*
@@ -208,17 +211,19 @@
         cartSection.classList.add('hidden');
         toggleCartBtn.classList.add('hidden');
         adminSection.classList.remove('hidden');
+        currentState = 'menu'; // Resetear el estado al entrar en admin
       } else if (isClosed) {
         closedMessage.classList.remove('hidden');
         menuSection.classList.add('hidden');
         cartSection.classList.add('hidden');
         toggleCartBtn.classList.add('hidden');
         adminSection.classList.add('hidden');
+        currentState = 'menu'; // Resetear el estado si está cerrado
       } else {
         closedMessage.classList.add('hidden');
-        menuSection.classList.remove('hidden');
-        toggleCartBtn.classList.remove('hidden');
         adminSection.classList.add('hidden');
+        toggleCartBtn.classList.remove('hidden');
+        // No cambiamos menuSection ni cartSection aquí, lo manejamos con toggleCartBtn
       }
     }
 
@@ -537,15 +542,60 @@
       customerAddress.value = activeMenuDay; // Restablecer al valor por defecto
       customerDetails.value = '';
       cartSection.classList.add('hidden');
+      currentState = 'menu'; // Volver al estado 'menu'
+      history.pushState({ page: 'menu' }, 'Menú', '#menu'); // Actualizar el historial
+      toggleCartBtn.textContent = `Carrito (${cart.reduce((sum, item) => sum + item.quantity, 0)})`; // Actualizar texto del botón
       renderCart();
     });
 
-    // Alternar carrito
+    // Alternar carrito y manejar el historial
     toggleCartBtn.addEventListener('click', () => {
       cartSection.classList.toggle('hidden');
       menuSection.classList.toggle('hidden');
-      toggleCartBtn.textContent = cartSection.classList.contains('hidden') ? `Carrito (${cart.reduce((sum, item) => sum + item.quantity, 0)})` : 'Menú';
+      if (cartSection.classList.contains('hidden')) {
+        // Volviendo al menú
+        currentState = 'menu';
+        history.pushState({ page: 'menu' }, 'Menú', '#menu');
+        toggleCartBtn.textContent = `Carrito (${cart.reduce((sum, item) => sum + item.quantity, 0)})`;
+      } else {
+        // Abriendo el carrito
+        currentState = 'cart';
+        history.pushState({ page: 'cart' }, 'Carrito', '#cart');
+        toggleCartBtn.textContent = 'Menú';
+      }
       renderCart(); // Asegurarse de que el color del botón se actualice
+    });
+
+    // Manejar el botón "Atrás" del navegador
+    window.addEventListener('popstate', (event) => {
+      if (isAdmin) {
+        // Si está en modo admin, permitir el comportamiento por defecto del navegador
+        return;
+      }
+
+      if (currentState === 'cart') {
+        // Si está en el carrito, regresar al menú
+        cartSection.classList.add('hidden');
+        menuSection.classList.remove('hidden');
+        currentState = 'menu';
+        toggleCartBtn.textContent = `Carrito (${cart.reduce((sum, item) => sum + item.quantity, 0)})`;
+        history.pushState({ page: 'menu' }, 'Menú', '#menu');
+        renderCart();
+      } else if (currentState === 'menu') {
+        // Si está en el menú, mostrar mensaje de confirmación
+        const confirmExit = window.confirm('¿Desea salir del sitio?');
+        if (confirmExit) {
+          // Permitir salir del sitio
+          window.history.back();
+        } else {
+          // Mantenerse en el menú
+          history.pushState({ page: 'menu' }, 'Menú', '#menu');
+          cartSection.classList.add('hidden');
+          menuSection.classList.remove('hidden');
+          currentState = 'menu';
+          toggleCartBtn.textContent = `Carrito (${cart.reduce((sum, item) => sum + item.quantity, 0)})`;
+        }
+      }
     });
 
     // Mostrar formulario de admin desde el menú
@@ -589,6 +639,9 @@
       updateVisibility();
       fetchProducts(); // Volver a cargar los productos del día actual
       fetchMenuDay(); // Actualizar el día del menú al cerrar sesión
+      // Asegurarse de que el historial refleje el estado del menú
+      history.pushState({ page: 'menu' }, 'Menú', '#menu');
+      currentState = 'menu';
     });
 
     // Establecer el día activo al hacer clic en el botón
@@ -706,6 +759,10 @@
     fetchProducts();
     updateVisibility();
     setInterval(updateVisibility, 60000); // Verifica cada minuto
+
+    // Asegurarse de que el historial comience en el estado 'menu'
+    history.pushState({ page: 'menu' }, 'Menú', '#menu');
   </script>
+  <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93724301d8c93382',t:'MTc0NTc5ODI0MS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
