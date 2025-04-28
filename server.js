@@ -1,6 +1,7 @@
 const express = require('express');
 const { Pool } = require('pg');
 const path = require('path');
+const bcrypt = require('bcrypt');
 const app = express();
 
 // Variable para almacenar el día activo del menú (por defecto Jueves)
@@ -12,8 +13,41 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
+pool.connect()
+  .then(() => console.log('Conectado a PostgreSQL'))
+  .catch(err => console.error('Error al conectar a PostgreSQL:', err));
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Inicializar configuraciones por defecto si no existen
+async function initializeSettings() {
+  try {
+    const result = await pool.query('SELECT * FROM settings WHERE id = 1');
+    if (result.rows.length === 0) {
+      // Esto no debería ocurrir si ya insertaste el registro inicial, pero lo dejamos como respaldo
+      const hashedPassword = await bcrypt.hash('zirus', 10);
+      await pool.query(
+        'INSERT INTO settings (whatsapp_number, special_orders_phone, admin_password) VALUES ($1, $2, $3)',
+        ['+523318331309', '3318331309', hashedPassword]
+      );
+      console.log('Configuraciones por defecto inicializadas');
+    } else if (result.rows[0].admin_password === 'temporary') {
+      // Actualizar la contraseña temporal con un hash seguro
+      const hashedPassword = await bcrypt.hash('zirus', 10);
+      await pool.query(
+        'UPDATE settings SET admin_password = $1 WHERE id = 1',
+        [hashedPassword]
+      );
+      console.log('Contraseña de administrador inicializada');
+    }
+  } catch (err) {
+    console.error('Error al inicializar configuraciones:', err);
+  }
+}
+
+// Llamar a la función de inicialización al iniciar el servidor
+initializeSettings();
 
 // Obtener productos (usar el día activo seleccionado por el admin)
 app.get('/api/products', async (req, res) => {
@@ -112,6 +146,69 @@ app.post('/api/set-menu-day', (req, res) => {
 // Obtener el día activo del menú
 app.get('/api/get-menu-day', (req, res) => {
   res.json({ day: activeMenuDay });
+});
+
+// Obtener las configuraciones
+app.get('/api/settings', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM settings WHERE id = 1');
+    if (result.rows.length === 0) {
+      return res.status(404).send('Configuraciones no encontradas');
+    }
+    res.json({
+      whatsappNumber: result.rows[0].whatsapp_number,
+      specialOrdersPhone: result.rows[0].special_orders_phone,
+      adminPassword: result.rows[0].admin_password
+    });
+  } catch (err) {
+    console.error('Error en GET /api/settings:', err.message);
+    res.status(500).send('Error en el servidor: ' + err.message);
+  }
+});
+
+// Actualizar las configuraciones
+app.post('/api/settings', async (req, res) => {
+  const { whatsappNumber, specialOrdersPhone, adminPassword } = req.body;
+  if (!whatsappNumber || !specialOrdersPhone || !adminPassword) {
+    return res.status(400).send('Faltan campos requeridos');
+  }
+  try {
+    const hashedPassword = await bcrypt.hash(adminPassword, 10);
+    const result = await pool.query(
+      'UPDATE settings SET whatsapp_number = $1, special_orders_phone = $2, admin_password = $3 WHERE id = 1 RETURNING *',
+      [whatsappNumber, specialOrdersPhone, hashedPassword]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).send('Configuraciones no encontradas');
+    }
+    res.json({ message: 'Configuraciones actualizadas con éxito' });
+  } catch (err) {
+    console.error('Error en POST /api/settings:', err.message);
+    res.status(500).send('Error en el servidor: ' + err.message);
+  }
+});
+
+// Verificar la contraseña de administrador
+app.post('/api/verify-admin-password', async (req, res) => {
+  const { password } = req.body;
+  if (!password) {
+    return res.status(400).send('Falta la contraseña');
+  }
+  try {
+    const result = await pool.query('SELECT admin_password FROM settings WHERE id = 1');
+    if (result.rows.length === 0) {
+      return res.status(404).send('Configuraciones no encontradas');
+    }
+    const isMatch = await bcrypt.compare(password, result.rows[0].admin_password);
+    if (isMatch) {
+      res.json({ success: true });
+    } else {
+      res.status(401).json({ success: false, message: 'Contraseña incorrecta' });
+    }
+  } catch (err) {
+    console.error('Error en POST /api/verify-admin-password:', err.message);
+    res.status(500).send('Error en el servidor: ' + err.message);
+  }
 });
 
 // Iniciar el servidor
