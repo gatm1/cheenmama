@@ -1,7 +1,6 @@
 const express = require('express');
 const { Pool } = require('pg');
 const path = require('path');
-const bcrypt = require('bcrypt');
 const app = express();
 
 // Variable para almacenar el día activo del menú (por defecto Jueves)
@@ -25,22 +24,14 @@ async function initializeSettings() {
   try {
     const result = await pool.query('SELECT * FROM settings WHERE id = 1');
     if (result.rows.length === 0) {
-      // Esto no debería ocurrir si ya insertaste el registro inicial, pero lo dejamos como respaldo
-      const hashedPassword = await bcrypt.hash('zirus', 10);
+      // Si no hay registro, insertar uno con valores por defecto
       await pool.query(
         'INSERT INTO settings (whatsapp_number, special_orders_phone, admin_password) VALUES ($1, $2, $3)',
-        ['+523318331309', '3318331309', hashedPassword]
+        ['+523318331309', '3318331309', 'zirus']
       );
       console.log('Configuraciones por defecto inicializadas');
-    } else if (result.rows[0].admin_password === 'zirus') {
-      // Actualizar la contraseña temporal con un hash seguro
-      const hashedPassword = await bcrypt.hash('zirus', 10);
-      await pool.query(
-        'UPDATE settings SET admin_password = $1 WHERE id = 1',
-        [hashedPassword]
-      );
-      console.log('Contraseña de administrador inicializada');
     }
+    // No necesitamos verificar si admin_password es 'temporary' porque ya no usamos hash
   } catch (err) {
     console.error('Error al inicializar configuraciones:', err);
   }
@@ -173,10 +164,9 @@ app.post('/api/settings', async (req, res) => {
     return res.status(400).send('Faltan campos requeridos');
   }
   try {
-    const hashedPassword = await bcrypt.hash(adminPassword, 10);
     const result = await pool.query(
       'UPDATE settings SET whatsapp_number = $1, special_orders_phone = $2, admin_password = $3 WHERE id = 1 RETURNING *',
-      [whatsappNumber, specialOrdersPhone, hashedPassword]
+      [whatsappNumber, specialOrdersPhone, adminPassword] // Guardamos adminPassword en texto plano
     );
     if (result.rows.length === 0) {
       return res.status(404).send('Configuraciones no encontradas');
@@ -199,8 +189,8 @@ app.post('/api/verify-admin-password', async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).send('Configuraciones no encontradas');
     }
-    const isMatch = await bcrypt.compare(password, result.rows[0].admin_password);
-    if (isMatch) {
+    const storedPassword = result.rows[0].admin_password;
+    if (password === storedPassword) {
       res.json({ success: true });
     } else {
       res.status(401).json({ success: false, message: 'Contraseña incorrecta' });
