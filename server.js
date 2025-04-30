@@ -3,9 +3,6 @@ const { Pool } = require('pg');
 const path = require('path');
 const app = express();
 
-// Variable para almacenar el día activo del menú (por defecto Jueves)
-let activeMenuDay = 'Jueves';
-
 // Configuración de la base de datos
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -26,12 +23,11 @@ async function initializeSettings() {
     if (result.rows.length === 0) {
       // Si no hay registro, insertar uno con valores por defecto
       await pool.query(
-        'INSERT INTO settings (whatsapp_number, special_orders_phone, admin_password) VALUES ($1, $2, $3)',
-        ['+523318331309', '3318331309', 'zirus']
+        'INSERT INTO settings (whatsapp_number, special_orders_phone, admin_password, active_menu_day) VALUES ($1, $2, $3, $4)',
+        ['+523334906992', '3334906992', 'zirus', 'Jueves']
       );
       console.log('Configuraciones por defecto inicializadas');
     }
-    // No necesitamos verificar si admin_password es 'temporary' porque ya no usamos hash
   } catch (err) {
     console.error('Error al inicializar configuraciones:', err);
   }
@@ -40,10 +36,16 @@ async function initializeSettings() {
 // Llamar a la función de inicialización al iniciar el servidor
 initializeSettings();
 
-// Obtener productos (usar el día activo seleccionado por el admin)
+// Obtener productos (usar el día activo almacenado en la base de datos)
 app.get('/api/products', async (req, res) => {
   try {
-    // Usar el día activo seleccionado por el admin
+    // Obtener el día activo desde la base de datos
+    const settingsResult = await pool.query('SELECT active_menu_day FROM settings WHERE id = 1');
+    if (settingsResult.rows.length === 0) {
+      return res.status(404).send('Configuraciones no encontradas');
+    }
+    const activeMenuDay = settingsResult.rows[0].active_menu_day;
+
     const result = await pool.query(
       'SELECT * FROM products WHERE day = $1 ORDER BY category, name',
       [activeMenuDay]
@@ -74,6 +76,10 @@ app.post('/api/products', async (req, res) => {
   if (!name || !price || !category || !day) {
     return res.status(400).send('Faltan campos requeridos');
   }
+  // Validar que el día sea permitido
+  if (!['Jueves', 'Viernes', 'Sábado'].includes(day)) {
+    return res.status(400).send('Día inválido. Debe ser "Jueves", "Viernes" o "Sábado".');
+  }
   try {
     const result = await pool.query(
       'INSERT INTO products (name, description, price, category, day) VALUES ($1, $2, $3, $4, $5) RETURNING *',
@@ -92,6 +98,10 @@ app.put('/api/products/:id', async (req, res) => {
   const { name, description, price, category, day } = req.body;
   if (!name || !price || !category || !day) {
     return res.status(400).send('Faltan campos requeridos');
+  }
+  // Validar que el día sea permitido
+  if (!['Jueves', 'Viernes', 'Sábado'].includes(day)) {
+    return res.status(400).send('Día inválido. Debe ser "Jueves", "Viernes" o "Sábado".');
   }
   try {
     const result = await pool.query(
@@ -123,20 +133,40 @@ app.delete('/api/products/:id', async (req, res) => {
   }
 });
 
-// Establecer el día activo del menú
-app.post('/api/set-menu-day', (req, res) => {
+// Establecer el día activo del menú (guardar en la base de datos)
+app.post('/api/set-menu-day', async (req, res) => {
   const { day } = req.body;
-  if (day !== 'Jueves' && day !== 'Viernes') {
-    return res.status(400).send('Día inválido. Debe ser "Jueves" o "Viernes".');
+  if (!['Jueves', 'Viernes', 'Sábado'].includes(day)) {
+    return res.status(400).send('Día inválido. Debe ser "Jueves", "Viernes" o "Sábado".');
   }
-  activeMenuDay = day;
-  console.log(`Día activo del menú cambiado a: ${activeMenuDay}`);
-  res.json({ message: `Menú activo cambiado a ${day}` });
+  try {
+    const result = await pool.query(
+      'UPDATE settings SET active_menu_day = $1 WHERE id = 1 RETURNING *',
+      [day]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).send('Configuraciones no encontradas');
+    }
+    console.log(`Día activo del menú cambiado a: ${day}`);
+    res.json({ message: `Menú activo cambiado a ${day}` });
+  } catch (err) {
+    console.error('Error en POST /api/set-menu-day:', err.message);
+    res.status(500).send('Error en el servidor: ' + err.message);
+  }
 });
 
-// Obtener el día activo del menú
-app.get('/api/get-menu-day', (req, res) => {
-  res.json({ day: activeMenuDay });
+// Obtener el día activo del menú (leer desde la base de datos)
+app.get('/api/get-menu-day', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT active_menu_day FROM settings WHERE id = 1');
+    if (result.rows.length === 0) {
+      return res.status(404).send('Configuraciones no encontradas');
+    }
+    res.json({ day: result.rows[0].active_menu_day });
+  } catch (err) {
+    console.error('Error en GET /api/get-menu-day:', err.message);
+    res.status(500).send('Error en el servidor: ' + err.message);
+  }
 });
 
 // Obtener las configuraciones
@@ -166,7 +196,7 @@ app.post('/api/settings', async (req, res) => {
   try {
     const result = await pool.query(
       'UPDATE settings SET whatsapp_number = $1, special_orders_phone = $2, admin_password = $3 WHERE id = 1 RETURNING *',
-      [whatsappNumber, specialOrdersPhone, adminPassword] // Guardamos adminPassword en texto plano
+      [whatsappNumber, specialOrdersPhone, adminPassword]
     );
     if (result.rows.length === 0) {
       return res.status(404).send('Configuraciones no encontradas');
