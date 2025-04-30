@@ -59,6 +59,7 @@
         <select id="active-menu-day" class="w-full p-2 border rounded">
           <option value="Jueves">Jueves</option>
           <option value="Viernes">Viernes</option>
+          <option value="Sábado">Sábado (Ventas Especiales)</option>
         </select>
         <button id="set-menu-day-btn" class="mt-2 w-full bg-purple-500 text-white p-2 rounded">Establecer Día Activo</button>
       </div>
@@ -68,6 +69,7 @@
           <option value="">Todos los días</option>
           <option value="Jueves">Jueves</option>
           <option value="Viernes">Viernes</option>
+          <option value="Sábado">Sábado</option>
         </select>
       </div>
       <div class="bg-white p-4 rounded-lg shadow mb-4">
@@ -85,6 +87,7 @@
           <option value="">Selecciona día</option>
           <option value="Jueves">Jueves</option>
           <option value="Viernes">Viernes</option>
+          <option value="Sábado">Sábado (Ventas Especiales)</option>
         </select>
         <button id="add-product-btn" class="w-full bg-green-500 text-white p-2 rounded">Agregar</button>
       </div>
@@ -104,6 +107,7 @@
           <option value="">Selecciona día</option>
           <option value="Jueves">Jueves</option>
           <option value="Viernes">Viernes</option>
+          <option value="Sábado">Sábado (Ventas Especiales)</option>
         </select>
         <button id="update-product-btn" class="w-full bg-blue-500 text-white p-2 rounded">Guardar Cambios</button>
         <button id="cancel-edit-btn" class="w-full bg-gray-500 text-white p-2 rounded mt-2">Cancelar</button>
@@ -212,7 +216,7 @@
         if (isAdmin) {
           whatsappNumberInput.value = settings.whatsappNumber;
           specialOrdersPhoneInput.value = settings.specialOrdersPhone;
-          adminPasswordInputSettings.value = settings.adminPassword; // Ahora mostramos la contraseña en texto plano
+          adminPasswordInputSettings.value = settings.adminPassword;
         }
       } catch (err) {
         console.error('Error fetching settings:', err);
@@ -255,7 +259,7 @@
         if (response.ok) {
           settings.whatsappNumber = whatsappNumber;
           settings.specialOrdersPhone = specialOrdersPhone;
-          settings.adminPassword = adminPassword; // Almacenamos la contraseña en texto plano
+          settings.adminPassword = adminPassword;
           specialOrdersPhoneText.textContent = `Pedidos especiales al teléfono: ${settings.specialOrdersPhone}`;
           alert(result.message);
         } else {
@@ -285,7 +289,7 @@
         // Actualizar los valores del formulario de configuraciones
         whatsappNumberInput.value = settings.whatsappNumber;
         specialOrdersPhoneInput.value = settings.specialOrdersPhone;
-        adminPasswordInputSettings.value = settings.adminPassword; // Mostramos la contraseña en texto plano
+        adminPasswordInputSettings.value = settings.adminPassword;
       } else if (isClosed) {
         closedMessage.classList.remove('hidden');
         menuSection.classList.add('hidden');
@@ -306,7 +310,7 @@
         const res = await fetch('/api/get-menu-day');
         const data = await res.json();
         activeMenuDay = data.day;
-        menuDayTitle.textContent = `Menú para el ${activeMenuDay}`;
+        menuDayTitle.textContent = `Menú para el ${activeMenuDay}${activeMenuDay === 'Sábado' ? ' (Ventas Especiales)' : ''}`;
         customerAddress.value = activeMenuDay; // Establecer el día del pedido por defecto
       } catch (err) {
         console.error('Error fetching menu day:', err);
@@ -374,7 +378,7 @@
         const result = await response.json();
         if (response.ok) {
           activeMenuDay = day;
-          menuDayTitle.textContent = `Menú para el ${activeMenuDay}`;
+          menuDayTitle.textContent = `Menú para el ${activeMenuDay}${activeMenuDay === 'Sábado' ? ' (Ventas Especiales)' : ''}`;
           customerAddress.value = activeMenuDay; // Actualizar el día del pedido
           alert(result.message);
           fetchProducts(); // Recargar productos para reflejar el cambio
@@ -589,8 +593,8 @@
         alert('Por favor, completa el nombre, día del pedido y agrega productos al carrito.');
         return;
       }
-      if (orderDay !== 'Jueves' && orderDay !== 'Viernes') {
-        alert('El día del pedido debe ser "Jueves" o "Viernes".');
+      if (!['Jueves', 'Viernes', 'Sábado'].includes(orderDay)) {
+        alert('El día del pedido debe ser "Jueves", "Viernes" o "Sábado".');
         return;
       }
       const orderDetails = cart.map(item => {
@@ -601,7 +605,7 @@
         const price = typeof item.price === 'number' ? item.price : parseFloat(item.price || 0);
         return sum + price * item.quantity;
       }, 0);
-      let message = `Nuevo pedido de ${name}\nDía del pedido: ${orderDay}\n\n${orderDetails}\n\nTotal: $${total.toFixed(2)}`;
+      let message = `Nuevo pedido de ${name}\nDía del pedido: ${orderDay}${orderDay === 'Sábado' ? ' (Ventas Especiales)' : ''}\n\n${orderDetails}\n\nTotal: $${total.toFixed(2)}`;
       if (details) {
         message += `\n\nDetalles adicionales: ${details}`;
       }
@@ -834,5 +838,6 @@
     history.pushState({ page: 'menu' }, 'Menú', '#menu');
   </script>
   <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93724301d8c93382',t:'MTc0NTc5ODI0MS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'938a6c861b586751',t:'MTc0NjA1MTYwMC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
